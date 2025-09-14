@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enhanced Food Billing System</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    body, .container, input, button, textarea {
+      transition: all 0.3s ease-in-out;
+    }
+
+    /* Light Mode */
+    body.light-mode {
+      background: linear-gradient(135deg, #f0f9ff, #ffffff);
+      color: #222;
+    }
+    body.light-mode .container {
+      background: #fff;
+      color: #222;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 12px;
+    }
+    body.light-mode button {
+      background: #0078d7;
+      color: #fff;
+    }
+    body.light-mode button:hover {
+      background: #005bbb;
+    }
+
+    /* Dark Mode */
+    body.dark-mode {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      color: #eee;
+    }
+    body.dark-mode .container {
+      background: #1e293b;
+      color: #eee;
+      box-shadow: 0 0 15px rgba(0,0,0,0.6);
+      border-radius: 12px;
+    }
+    body.dark-mode button {
+      background: #0ea5e9;
+      color: #fff;
+    }
+    body.dark-mode button:hover {
+      background: #0284c7;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    body.dark-mode th, body.dark-mode td {
+      border: 1px solid #475569;
+    }
+    body.dark-mode th {
+      background: #0284c7;
+      color: #fff;
+    }
+    body.light-mode th {
+      background: #0078d7;
+      color: #fff;
+    }
+  </style>
+</head>
+<body class="light-mode">
+  <div style="text-align:right; padding:10px;">
+    <button id="themeToggle" style="padding:6px 12px; border:none; border-radius:8px; cursor:pointer;">
+      🌙 Dark Mode
+    </button>
+  </div>
+
+  <div class="logo-top" style="text-align:center; margin:12px 0;">
+    <img src="./logo.jpg" alt="Restaurant Logo" style="max-width:140px;">
+  </div>
+
+  <div id="welcomeMsg" style="display:none;text-align:center;padding:6px 0;">Welcome to XYZ Restaurant!</div>
+  <div class="container" role="main" style="max-width:900px;margin:0 auto;padding:1rem;">
+    <h2>Food Billing System</h2>
+    <form id="orderForm" autocomplete="off">
+      <label for="food_name">Food Name:</label><br>
+      <input list="foods" id="food_name" name="food_name" required aria-describedby="foodHelp" />
+      <datalist id="foods"></datalist>
+      <button type="button" id="voiceInputFood" title="Speak food name" aria-pressed="false" aria-label="Speak food name">🎙</button>
+      <div id="foodHelp" style="font-size:12px;color:#666;margin-bottom:8px;">Select or speak the food name</div>
+
+      <label for="quantity">Quantity:</label><br>
+      <input type="number" id="quantity" name="quantity" value="1" min="1" required />
+      <button type="button" id="voiceInputQty" title="Speak quantity" aria-pressed="false" aria-label="Speak quantity">🔊</button>
+
+      <div style="margin-top:10px;">
+        <button type="submit">Add to Order</button>
+      </div>
+    </form>
+
+    <div id="orderList" aria-live="polite" style="margin-top:1rem;"></div>
+    <hr />
+    <div style="display:flex;gap:8px;">
+      <button id="generateBill">Generate Bill</button>
+      <button id="printBtn" type="button" disabled>Print Bill</button>
+      <button id="downloadPDF" type="button" disabled>Download PDF</button>
+    </div>
+    <div id="billArea" style="margin-top:1em;"></div>
+  </div>
+
+  <!-- User Info Modal -->
+  <div id="userInfoModal" aria-hidden="true" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;">
+    <div role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="background:#fff;padding:2em;border-radius:15px;max-width:400px;margin:auto;box-shadow:0 0 20px rgba(0,0,0,0.25);">
+      <h3 id="modalTitle" style="margin-top:0;">Enter Your Details</h3>
+      <form id="userInfoForm" autocomplete="off">
+        <label for="customerName">Name <span style="color:red;">*</span></label><br />
+        <input type="text" id="customerName" name="customerName" required /><br /><br />
+        <label for="customerMobile">Mobile Number <span style="color:red;">*</span></label><br />
+        <input type="tel" id="customerMobile" name="customerMobile" pattern="\d{7,15}" placeholder="Digits only" required /><br /><br />
+        <label for="customerAddress">Address (Optional)</label><br />
+        <textarea id="customerAddress" name="customerAddress" rows="3"></textarea><br />
+        <div style="text-align:right;">
+          <button type="button" id="cancelUserInfo" style="margin-right:1em;">Cancel</button>
+          <button type="submit" style="background:#0288d1;color:#fff;padding:0.6em 1.2em;border:none;border-radius:12px;">Proceed</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const TTS_LANG = 'en-IN';
+  const currency = amt => `₹${Number(amt).toFixed(2)}`;
+  const welcome = document.getElementById('welcomeMsg');
+  const datalist = document.getElementById('foods');
+  const orderForm = document.getElementById('orderForm');
+  const orderList = document.getElementById('orderList');
+  const billArea = document.getElementById('billArea');
+  const generateBillBtn = document.getElementById('generateBill');
+  const printBtn = document.getElementById('printBtn');
+  const downloadPDFBtn = document.getElementById('downloadPDF');
+  const userInfoModal = document.getElementById('userInfoModal');
+  const userInfoForm = document.getElementById('userInfoForm');
+  const cancelUserInfoBtn = document.getElementById('cancelUserInfo');
+  const voiceFoodBtn = document.getElementById('voiceInputFood');
+  const voiceQtyBtn = document.getElementById('voiceInputQty');
+
+  let foodPrices = {};
+  let order = [];
+
+  welcome.style.display = 'block';
+  setTimeout(() => { welcome.style.display = 'none'; }, 3500);
+
+  // Load foods (API or fallback)
+  (async function loadFoods() {
+    try {
+      const resp = await fetch('/api/foods');
+      if (!resp.ok) throw new Error('API not OK');
+      const data = await resp.json();
+      if (!Array.isArray(data)) throw new Error('Invalid foods data');
+      populateFoods(data);
+    } catch {
+      const fallback = [
+        { food_name: 'Tea', price: 20 },
+        { food_name: 'Coffee', price: 40 },
+        { food_name: 'Samosa', price: 25 },
+        { food_name: 'Maggi', price: 60 },
+        { food_name: 'Fried Rice', price: 120 }
+      ];
+      populateFoods(fallback);
+    }
+  })();
+
+  function populateFoods(list) {
+    datalist.innerHTML = '';
+    foodPrices = {};
+    list.forEach(item => {
+      const name = String(item.food_name || '').trim();
+      datalist.insertAdjacentHTML('beforeend', `<option value="${name}">`);
+      foodPrices[name.toLowerCase()] = parseFloat(item.price || 0);
+    });
+  }
+
+  orderForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    addOrderItem();
+  });
+
+  function addOrderItem() {
+    const name = document.getElementById('food_name').value.trim();
+    const qty = parseInt(document.getElementById('quantity').value, 10) || 0;
+    if (!name || qty < 1) return alert('Enter valid food and quantity');
+    const price = foodPrices[name.toLowerCase()] || 0;
+    const idx = order.findIndex(o => o.name.toLowerCase() === name.toLowerCase());
+    if (idx >= 0) order[idx].qty += qty;
+    else order.push({ name, qty, price });
+    orderForm.reset();
+    document.getElementById('quantity').value = 1;
+    renderOrder();
+  }
+
+  function renderOrder() {
+    if (!order.length) { orderList.innerHTML = '<p>No items yet.</p>'; disableBillActions(); return; }
+    let total = 0;
+    let html = `<h4>Your Order</h4><table style="border-collapse:collapse;width:100%;text-align:center;font-family:Arial;font-size:14px;">
+      <thead style="background:#2980b9;color:#fff;"><tr><th>Food</th><th>Qty</th><th>Price</th><th>Amount</th><th>Action</th></tr></thead><tbody>`;
+    order.forEach((o, i) => {
+      const amt = o.qty * (o.price || 0);
+      total += amt;
+      html += `<tr>
+        <td style="padding:6px;border:1px solid #ccc;text-align:left;">${escapeHtml(o.name)}</td>
+        <td style="padding:6px;border:1px solid #ccc;">${o.qty}</td>
+        <td style="padding:6px;border:1px solid #ccc;">${currency(o.price)}</td>
+        <td style="padding:6px;border:1px solid #ccc;">${currency(amt)}</td>
+        <td style="padding:6px;border:1px solid #ccc;">
+          <button data-idx="${i}" class="removeBtn" style="background:#e74c3c;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">❌</button>
+        </td>
+      </tr>`;
+    });
+    html += `<tr>
+      <td colspan="3" style="text-align:right;padding:8px;border:1px solid #ccc;"><strong>Total</strong></td>
+      <td style="padding:8px;border:1px solid #ccc;"><strong>${currency(total)}</strong></td>
+      <td style="border:1px solid #ccc;"></td>
+    </tr></tbody></table>`;
+    orderList.innerHTML = html;
+    document.querySelectorAll('.removeBtn').forEach(btn => {
+      btn.addEventListener('click', ev => { order.splice(Number(ev.currentTarget.dataset.idx), 1); renderOrder(); });
+    });
+    enableBillActions();
+  }
+
+  function escapeHtml(text) {
+    return text ? String(text).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) : '';
+  }
+
+  function enableBillActions() { generateBillBtn.disabled = false; }
+  function disableBillActions() { generateBillBtn.disabled = true; printBtn.disabled = true; downloadPDFBtn.disabled = true; }
+  disableBillActions();
+
+  async function speakText(text) {
+    return new Promise(resolve => {
+      if (!('speechSynthesis' in window)) return resolve();
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = TTS_LANG;
+      u.onend = u.onerror = () => resolve();
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  // === Voice Input Feature ===
+  function voiceInput(callback, promptText) {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice input not supported in this browser');
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = TTS_LANG;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    speakText(promptText).then(() => recognition.start());
+    recognition.onresult = (event) => {
+      const spoken = event.results[0][0].transcript.trim();
+      callback(spoken);
+    };
+    recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
+  }
+
+  voiceFoodBtn.addEventListener('click', () => {
+    voiceInput(val => {
+      document.getElementById('food_name').value = val;
+      speakText(`You said ${val}`);
+    }, 'Please say the food name');
+  });
+
+  voiceQtyBtn.addEventListener('click', () => {
+    voiceInput(val => {
+      const qty = parseInt(val.match(/\d+/)?.[0] || '1', 10);
+      document.getElementById('quantity').value = qty;
+      speakText(`Quantity set to ${qty}`);
+    }, 'Please say the quantity');
+  });
+
+  generateBillBtn.addEventListener('click', () => { if (!order.length) return alert('Add food first'); openModal(); });
+  function openModal() { userInfoModal.style.display = 'flex'; userInfoModal.setAttribute('aria-hidden','false'); document.getElementById('customerName').focus(); }
+  function closeModal() { userInfoModal.style.display = 'none'; userInfoModal.setAttribute('aria-hidden','true'); }
+  cancelUserInfoBtn.addEventListener('click', closeModal);
+
+  userInfoForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('customerName').value.trim();
+    const mobile = document.getElementById('customerMobile').value.trim();
+    const address = document.getElementById('customerAddress').value.trim();
+    if (!name) return alert('Enter name');
+    if (!mobile.match(/^\d{7,15}$/)) return alert('Enter valid mobile number');
+    closeModal();
+    const payload = { order, customer: { name, mobile, address }, generatedAt: new Date().toLocaleString() };
+    billArea.innerHTML = buildBillHTML(payload);
+    printBtn.disabled = false; downloadPDFBtn.disabled = false;
+    await speakText(`Bill generated for ${name}. Total amount ${calculateTotal(order)} rupees.`);
+  });
+
+  function buildBillHTML({ order, customer, generatedAt }) {
+    const rows = order.map(o => {
+      const amt = o.qty * (o.price || 0);
+      return `<tr><td style="padding:6px;border:1px solid #ccc;">${escapeHtml(o.name)}</td>
+              <td style="padding:6px;border:1px solid #ccc;">${o.qty}</td>
+              <td style="padding:6px;border:1px solid #ccc;">${currency(o.price)}</td>
+              <td style="padding:6px;border:1px solid #ccc;">${currency(amt)}</td></tr>`;
+    }).join('');
+    return `<div style="font-family:Arial;">
+      <h3 style="margin:6px 0;text-align:center;">XYZ Restaurant Bill</h3>
+      <div><strong>Name:</strong> ${escapeHtml(customer.name)} &nbsp;&nbsp; <strong>Mobile:</strong> ${escapeHtml(customer.mobile)}</div>
+      <div style="margin-top:8px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead style="background:#2980b9;color:#fff;"><tr><th>Food</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>
+          <tbody>${rows}<tr>
+            <td colspan="3" style="text-align:right;padding:8px;border:1px solid #ccc;"><strong>Total</strong></td>
+            <td style="padding:8px;border:1px solid #ccc;"><strong>${currency(calculateTotal(order))}</strong></td>
+          </tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;text-align:center;color:#666;">Date: ${generatedAt}</div>
+    </div>`;
+  }
+
+  function calculateTotal(order) {
+    return order.reduce((s, o) => s + (o.qty * (o.price || 0)), 0).toFixed(2);
+  }
+
+  // Print functionality
+  printBtn.addEventListener('click', () => {
+    if (!billArea.innerHTML.trim()) return alert('No bill to print');
+    const logoSrc = new URL('./logo.jpg', window.location.href).href;
+    const billHtml = `<div style="text-align:center;"><img src="${logoSrc}" style="max-width:120px;margin-bottom:10px;"></div>` + billArea.innerHTML;
+    const win = window.open('','', 'height=700,width=900');
+    if (!win) return alert('Allow popups for printing');
+    win.document.write('<html><head><title>Bill</title><style>body{font-family:Arial;margin:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #000;padding:8px;text-align:left;}th{background-color:#f2f2f2;}</style></head><body>');
+    win.document.write(billHtml);
+    win.document.write('</body></html>');
+    win.document.close();
+    win.focus();
+    win.print();
+  });
+
+  // Download PDF
+  downloadPDFBtn.addEventListener('click', async () => {
+    if (!billArea.innerHTML.trim()) return alert('No bill to download');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    try { const logo = await toDataURL('./logo.jpg'); if(logo) doc.addImage(logo,'JPEG',80,10,50,20); } catch {}
+    doc.setFontSize(16); doc.text('XYZ Restaurant Bill', doc.internal.pageSize.width/2, 40, { align:'center' });
+    const name = document.getElementById('customerName').value.trim();
+    const mobile = document.getElementById('customerMobile').value.trim();
+    const address = document.getElementById('customerAddress').value.trim();
+    let yOffset=50; doc.setFontSize(12); doc.text(`Name: ${name}`,14,yOffset); doc.text(`Mobile: ${mobile}`,110,yOffset);
+    if(address){ doc.text(`Address: ${address}`,14,yOffset+8); yOffset+=8;}
+    doc.setFontSize(10); doc.text(`Date: ${new Date().toLocaleString()}`,14,yOffset+12);
+    let total=0;
+    const headers = ["Food","Qty","Price","Amount"];
+    const rows = order.map(o=>{ const amt=o.qty*(o.price||0); total+=amt; return [o.name,String(o.qty),currency(o.price),currency(amt)];});
+    doc.autoTable({ head:[headers], body:rows, startY:yOffset+18, theme:'grid', styles:{halign:'center',fontSize:11,cellPadding:3}, headStyles:{fillColor:[41,128,185],textColor:[255,255,255]}});
+    const finalY=doc.lastAutoTable?doc.lastAutoTable.finalY:yOffset+18;
+    doc.setFontSize(12); doc.text(`Total: ${currency(total)}`,doc.internal.pageSize.width-14,finalY+10,{align:'right'});
+    doc.setFontSize(10); doc.text('Thank you for visiting! Come again.',doc.internal.pageSize.width/2,doc.internal.pageSize.height-10,{align:'center'});
+    doc.save('bill.pdf');
+  });
+
+  async function toDataURL(url){
+    try{ const resp=await fetch(url,{mode:'cors'}); if(!resp.ok)throw new Error('Fetch failed'); const blob=await resp.blob();
+      return await new Promise((resolve,reject)=>{const reader=new FileReader(); reader.onloadend=()=>resolve(reader.result); reader.onerror=reject; reader.readAsDataURL(blob);}); 
+    } catch{ return new Promise(resolve=>{const img=new Image(); img.crossOrigin="Anonymous"; img.onload=function(){try{const canvas=document.createElement('canvas');canvas.width=this.width;canvas.height=this.height; const ctx=canvas.getContext('2d'); ctx.drawImage(this,0,0); resolve(canvas.toDataURL('image/jpeg'));}catch{resolve(null);}}; img.onerror=()=>resolve(null); img.src=url;}); }
+  }
+
+});
+
+</script>
+<script src="./app.js"></script>
+</body>
+</html>  

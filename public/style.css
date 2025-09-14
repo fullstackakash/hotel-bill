@@ -1,0 +1,193 @@
+/* === Global Styles === */
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e0f2ff, #ffffff);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 30px;
+  color: #333;
+}
+
+/* === Container === */
+.container {
+  background: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 900px;
+}
+
+/* === Headings === */
+h1, h2 {
+  text-align: center;
+  color: #005bbb;
+  margin-bottom: 20px;
+}
+
+/* === Form Styling === */
+form {
+  margin-bottom: 30px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #444;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 15px;
+  margin-bottom: 18px;
+  box-sizing: border-box;
+  transition: all 0.2s ease-in-out;
+}
+
+input:focus, select:focus {
+  border-color: #0078d7;
+  box-shadow: 0 0 6px rgba(0, 120, 215, 0.3);
+  outline: none;
+}
+
+/* === Buttons === */
+button {
+  background: linear-gradient(135deg, #0078d7, #005bbb);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: inline-block;
+  margin-right: 10px;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #005bbb, #004080);
+  box-shadow: 0 4px 10px rgba(0, 91, 187, 0.3);
+}
+
+/* === Table Styling === */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 20px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 15px;
+}
+
+th {
+  background: #005bbb;
+  color: #fff;
+  font-weight: 600;
+}
+
+tr:nth-child(even) {
+  background: #f7faff;
+}
+
+tr:hover {
+  background: #e6f2ff;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px;
+  }
+  table, th, td {
+    font-size: 14px;
+  }
+}
+/* Transition smoothness */
+body, .container, table, input, select, button {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Light Mode (default) */
+body.light-mode {
+  background: linear-gradient(135deg, #e0f2ff, #ffffff);
+  color: #222;
+}
+body.light-mode .container {
+  background: #fff;
+  color: #222;
+}
+body.light-mode table {
+  background: #fff;
+  color: #222;
+}
+body.light-mode th {
+  background: #005bbb;
+  color: #fff;
+}
+
+/* Dark Mode */
+body.dark-mode {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  color: #eee;
+}
+
+body.dark-mode .container {
+  background: #1e293b;
+  color: #eee;
+  box-shadow: 0 6px 20px rgba(255,255,255,0.08);
+}
+
+body.dark-mode table {
+  background: #243447;
+  color: #eee;
+}
+
+body.dark-mode th {
+  background: #0078d7; /* bright blue for dark mode */
+  color: #fff;         /* white text for visibility */
+}
+
+body.dark-mode tr:nth-child(even) {
+  background: #2d3e50;
+}
+
+body.dark-mode tr:hover {
+  background: #3b4a5c;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background: #2d3e50;
+  color: #fff;
+  border: 1px solid #555;
+}
+
+body.dark-mode input:focus,
+body.dark-mode select:focus,
+body.dark-mode textarea:focus {
+  border-color: #4da3ff;
+  box-shadow: 0 0 6px rgba(77,163,255,0.5);
+}
+
+body.dark-mode button {
+  background: linear-gradient(135deg, #4da3ff, #0078d7);
+  color: #fff;
+}
