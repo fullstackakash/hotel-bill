@@ -58,6 +58,17 @@ app.get('/api/foods', async (req, res) => {
   }
 });
 
+// 🔹 Debug route to check DB connection and foods
+app.get("/debug", async (req, res) => {
+  try {
+    if (!mongoose.connection.readyState) return res.status(500).send("DB not connected");
+    const foods = await Food.find();
+    res.json({ dbConnected: true, foodCount: foods.length, foods });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 // API to generate bill and save it
 app.post('/api/bill', async (req, res) => {
   try {
