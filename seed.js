@@ -1,17 +1,17 @@
 const mongoose = require('mongoose');
+require('dotenv').config(); // Load environment variables
 
-// MongoDB Connection
-mongoose.connect('mongodb://localhost:27017/food_billing', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-});
+// MongoDB Atlas connection string from .env
+const mongoURI = process.env.MONGO_URI;
 
+// Define Food Schema and Model
 const foodSchema = new mongoose.Schema({
-  food_name: String,
-  price: Number
+  food_name: { type: String, required: true },
+  price: { type: Number, required: true }
 });
 const Food = mongoose.model('Food', foodSchema);
 
+// Sample food data
 const sampleFoods = [
   { food_name: "Pizza", price: 250 },
   { food_name: "Burger", price: 120 },
@@ -27,16 +27,27 @@ const sampleFoods = [
   { food_name: "Soup", price: 90 }
 ];
 
+// Seed function
 async function seedDatabase() {
   try {
+    await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    console.log('Connected to MongoDB Atlas for seeding');
+
     await Food.deleteMany({});
+    console.log('Existing food collection cleared');
+
     await Food.insertMany(sampleFoods);
     console.log('Sample foods inserted successfully');
   } catch (error) {
-    console.error('Error inserting sample foods:', error);
+    console.error('Error seeding database:', error);
   } finally {
-    mongoose.connection.close();
+    await mongoose.disconnect();
+    console.log('MongoDB connection closed after seeding');
   }
 }
 
+// Run seed
 seedDatabase();
