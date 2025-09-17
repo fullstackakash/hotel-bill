@@ -15,6 +15,16 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ✅ Fix for COOP/COEP blocking Google login postMessage
+app.use((req, res, next) => {
+  res.removeHeader("Cross-Origin-Opener-Policy");
+  res.removeHeader("Cross-Origin-Embedder-Policy");
+  // alternatively you can set instead of removing:
+  // res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  // res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  next();
+});
+
 const mongoURI = process.env.MONGO_URI;
 if (!mongoURI) {
   console.error('MONGO_URI not set in .env. Exiting.');
