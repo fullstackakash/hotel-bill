@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Enhanced Food Billing System with Google Login</title>
   <link rel="stylesheet" href="./style.css" />
-  
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
+
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- JWT decode library -->
@@ -47,20 +48,8 @@
 
   <div id="loginContainer">
     <h2>Please Login</h2>
-    <!-- Replace with your actual Google Client ID -->
-    <div id="g_id_onload"
-         data-client_id="502092753836-j6cclmke5h8rcsce60ni8cc4q80mpoau.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse"
-         data-auto_prompt="false">
-    </div>
-    <div class="g_id_signin"
-         data-type="standard"
-         data-size="large"
-         data-theme="outline"
-         data-text="sign_in_with"
-         data-shape="rectangular"
-         data-logo_alignment="left">
-    </div>
+    <!-- Google Sign-in Button (rendered via JS) -->
+    <div class="g_id_signin"></div>
   </div>
 
   <div id="userInfoDisplay" style="display:none;">
@@ -121,5 +110,29 @@
   </div>
 
   <script src="./app.js"></script>
+
+  <!-- Google Login Init -->
+  <script>
+    function handleCredentialResponse(response) {
+      const data = jwt_decode(response.credential);
+      document.getElementById("userName").textContent = data.name;
+      document.getElementById("userEmail").textContent = data.email;
+      document.getElementById("loginContainer").style.display = "none";
+      document.getElementById("userInfoDisplay").style.display = "block";
+      document.getElementById("billingContainer").style.display = "block";
+    }
+
+    window.onload = function () {
+      google.accounts.id.initialize({
+        client_id: "502092753836-j6cclmke5h8rcsce60ni8cc4q80mpoau.apps.googleusercontent.com",
+        callback: handleCredentialResponse
+      });
+
+      google.accounts.id.renderButton(
+        document.querySelector(".g_id_signin"),
+        { theme: "outline", size: "large" }
+      );
+    };
+  </script>
 </body>
 </html>
