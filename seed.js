@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 require('dotenv').config(); // Load environment variables
 
 // MongoDB Atlas connection string from .env
-const mongoURI = process.env.MONGO_URI;
+const mongoURI = process.env.MONGO_URI || process.env.MONGOURL || process.env.MONGO;
 
 // Define Food Schema and Model
 const foodSchema = new mongoose.Schema({
@@ -29,6 +29,11 @@ const sampleFoods = [
 
 // Seed function
 async function seedDatabase() {
+  if (!mongoURI) {
+    console.error('MONGO_URI is not set in .env. Aborting seed.');
+    process.exit(1);
+  }
+
   try {
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
