@@ -19,12 +19,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
   res.removeHeader("Cross-Origin-Opener-Policy");
   res.removeHeader("Cross-Origin-Embedder-Policy");
-  // alternatively you can set instead of removing:
-  // res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  // res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
   next();
 });
 
+// 🔹 MongoDB
 const mongoURI = process.env.MONGO_URI;
 if (!mongoURI) {
   console.error('MONGO_URI not set in .env. Exiting.');
@@ -38,6 +36,7 @@ mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
     process.exit(1);
   });
 
+// 🔹 Schemas
 const foodSchema = new mongoose.Schema({
   food_name: { type: String, required: true },
   price: { type: Number, required: true }
@@ -60,6 +59,7 @@ const billSchema = new mongoose.Schema({
 const Food = mongoose.model('Food', foodSchema);
 const Bill = mongoose.model('Bill', billSchema);
 
+// 🔹 API: Fetch foods
 app.get('/api/foods', async (req, res) => {
   try {
     const foods = await Food.find().sort({ food_name: 1 });
@@ -70,6 +70,7 @@ app.get('/api/foods', async (req, res) => {
   }
 });
 
+// 🔹 API: Send Bill (save + send link)
 app.post('/api/send-bill', async (req, res) => {
   try {
     const { customer, order } = req.body;
@@ -80,24 +81,24 @@ app.post('/api/send-bill', async (req, res) => {
       return res.status(400).json({ error: 'Order is empty' });
     }
 
+    // Calculate total
     let total = 0;
-    let billText = `Bill for ${customer.name}\n`;
-    order.forEach((item, i) => {
-      const amount = (item.price || 0) * (item.qty || 0);
-      total += amount;
-      billText += `${i + 1}. ${item.name} x ${item.qty} @ ₹${item.price} = ₹${amount}\n`;
+    order.forEach(item => {
+      total += (item.price || 0) * (item.qty || 0);
     });
-    billText += `Total: ₹${total.toFixed(2)}\nThank you for visiting!`;
 
     // Save bill into DB
     const bill = new Bill({
-      customer: { name: customer.name, email: customer.email, mobile: customer.mobile },
+      customer,
       order,
       total,
     });
     await bill.save();
 
-    // Twilio WhatsApp (only if configured)
+    // Unique bill link
+    const billLink = `${process.env.BASE_URL || 'http://localhost:' + PORT}/bills/${bill._id}`;
+
+    // 🔹 Twilio WhatsApp (if configured)
     if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM) {
       try {
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -109,17 +110,16 @@ app.post('/api/send-bill', async (req, res) => {
         await client.messages.create({
           from: 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM.replace(/^whatsapp:/, ''),
           to: 'whatsapp:' + whatsappTo.replace(/^whatsapp:/, ''),
-          body: billText
+          body: `Hello ${customer.name}, your bill is ready! Click here: ${billLink}`
         });
       } catch (twErr) {
         console.warn('Twilio send warning:', twErr);
-        // continue, don't fail entire request
       }
     } else {
       console.log('Twilio not configured; skipping WhatsApp send.');
     }
 
-    // Nodemailer Email (only if configured)
+    // 🔹 Nodemailer Email (if configured)
     if (process.env.EMAIL_SERVICE && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       try {
         let transporter = nodemailer.createTransport({
@@ -134,27 +134,60 @@ app.post('/api/send-bill', async (req, res) => {
           from: `"XYZ Restaurant" <${process.env.EMAIL_USER}>`,
           to: customer.email,
           subject: 'Your Bill from XYZ Restaurant',
-          text: billText
+          text: `Hello ${customer.name},\n\nYour bill is ready. View it here: ${billLink}\n\nThank you!`
         });
       } catch (mailErr) {
         console.warn('Email send warning:', mailErr);
-        // continue
       }
     } else {
       console.log('Email not configured; skipping email send.');
     }
 
-    res.json({ success: true, message: 'Bill saved. Attempts made to send via WhatsApp / Email.' });
+    res.json({ success: true, message: 'Bill saved and link sent.', link: billLink });
   } catch (err) {
     console.error('Send Bill Error:', err);
     res.status(500).json({ error: 'Failed to send bill' });
   }
 });
 
+// 🔹 Route: View Bill
+app.get('/bills/:id', async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) return res.status(404).send("Bill not found");
+
+    let html = `
+      <h2>XYZ Restaurant Bill</h2>
+      <p><b>Name:</b> ${bill.customer.name}</p>
+      <p><b>Email:</b> ${bill.customer.email}</p>
+      <p><b>Mobile:</b> ${bill.customer.mobile}</p>
+      <hr>
+      <table border="1" cellspacing="0" cellpadding="6">
+        <tr><th>Food</th><th>Qty</th><th>Price</th><th>Amount</th></tr>`;
+
+    bill.order.forEach(item => {
+      html += `<tr>
+        <td>${item.name}</td>
+        <td>${item.qty}</td>
+        <td>${item.price}</td>
+        <td>${item.qty * item.price}</td>
+      </tr>`;
+    });
+
+    html += `<tr><td colspan="3"><b>Total</b></td><td><b>${bill.total}</b></td></tr></table>`;
+    res.send(html);
+  } catch (err) {
+    console.error('Bill view error:', err);
+    res.status(500).send("Error loading bill");
+  }
+});
+
+// 🔹 Root route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 🔹 Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
