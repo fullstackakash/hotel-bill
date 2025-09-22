@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     billArea.innerHTML = '';
     order = [];
     renderOrder();
-    disableBillActions();
+    disableActions();
   }
   function showBillingUI(user) {
     loginContainer.style.display = 'none';
@@ -59,20 +59,20 @@ document.addEventListener('DOMContentLoaded', () => {
     userEmailSpan.textContent = user.email || '';
     attachVoiceListeners();
   }
-  function enableBillActions() {
-    generateBillBtn.disabled = false;
+  function enableActions() {
+    generateBillBtn.disabled = order.length === 0;
     sendBillBtn.disabled = order.length === 0;
-  }
-  function disableBillActions() {
-    generateBillBtn.disabled = true;
     printBtn.disabled = true;
     downloadPDFBtn.disabled = true;
+  }
+  function disableActions() {
+    generateBillBtn.disabled = true;
     sendBillBtn.disabled = true;
+    printBtn.disabled = true;
+    downloadPDFBtn.disabled = true;
   }
   function escapeHtml(text) {
-    return text ? String(text).replace(/[&<>"']/g, m => (
-      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"'"}[m]
-    )) : '';
+    return text ? String(text).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"'"}[m])) : '';
   }
 
   // Google Sign-In callback
@@ -106,9 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Load Foods
-  async function loadFoods() {
+  async function loadFoods(prefix = '') {
     try {
-      const resp = await fetch('/api/foods');
+      let url = '/api/foods';
+      if (prefix) url += `?startsWith=${prefix}`;
+      const resp = await fetch(url);
       if (!resp.ok) throw new Error('API not OK');
       const data = await resp.json();
       if (!Array.isArray(data)) throw new Error('Invalid foods data');
@@ -163,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderOrder() {
     if (!order.length) {
       orderList.innerHTML = '<p>No items yet.</p>';
-      disableBillActions();
+      disableActions();
       return;
     }
     let total = 0;
@@ -195,13 +197,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOrder();
       });
     });
-    enableBillActions();
+    enableActions();
   }
 
-  // Voice Food Input with instant suggestion
+  // Voice Input for Food Name - prefix-based suggestions
   function voiceFoodSuggest() {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser');
+      alert('Voice input not supported in this browser.');
       return;
     }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -210,14 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     let firstLetterHandled = false;
-
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript.trim();
       if (transcript && !firstLetterHandled) {
         const letter = transcript[0].toLowerCase();
-        fetch(`/api/foods?startsWith=${letter}`)
-          .then(resp => resp.json())
-          .then(list => populateFoods(list));
+        loadFoods(letter);
         firstLetterHandled = true;
       }
       if (event.results[0].isFinal) {
@@ -225,82 +224,121 @@ document.addEventListener('DOMContentLoaded', () => {
         speakText(`You said ${transcript}`);
       }
     };
-
     recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
     recognition.start();
   }
 
-  // Attach voice listeners to buttons
-  function attachVoiceListeners() {
-    const voiceFoodBtn = document.getElementById('voiceInputFood');
-    const voiceQtyBtn = document.getElementById('voiceInputQty');
-    const voiceMobileBtn = document.getElementById('voiceInputMobile');
-    const voiceAddressBtn = document.getElementById('voiceInputAddress');
-    if (voiceFoodBtn) {
-      voiceFoodBtn.addEventListener('click', voiceFoodSuggest);
-    }
-    if (voiceQtyBtn) {
-      voiceQtyBtn.addEventListener('click', () => {
-        voiceInput(val => {
-          const qty = parseInt(val.match(/\d+/)?.[0] || '1', 10);
-          document.getElementById('quantity').value = qty;
-          speakText(`Quantity set to ${qty}`);
-        }, 'Please say the quantity');
-      });
-    }
-    if (voiceMobileBtn) {
-      voiceMobileBtn.addEventListener('click', () => {
-        voiceInput(val => {
-          const digits = val.replace(/\D/g, '');
-          if (!digits) {
-            speakText("I couldn't catch a valid number, please try again.");
-            return;
-          }
-          document.getElementById('customerMobile').value = digits;
-          speakText(`You said mobile number ${digits.split('').join(' ')}`);
-        }, 'Please say your WhatsApp number in digits');
-      });
-    }
-    if (voiceAddressBtn) {
-      voiceAddressBtn.addEventListener('click', () => {
-        voiceInput(val => {
-          document.getElementById('customerAddress').value = val;
-          speakText(`Address set as: ${val}`);
-        }, 'Please say your address');
-      });
-    }
+  // Mapping words to numbers for Quantity voice input
+  function mapWordToNumber(word) {
+    const mapping = {
+      zero: 0,
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10
+    };
+    return mapping[word.toLowerCase()] ?? null;
   }
 
-  function speakText(text) {
-    return new Promise(resolve => {
-      if (!('speechSynthesis' in window)) return resolve();
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = TTS_LANG;
-      u.onend = u.onerror = () => resolve();
-      window.speechSynthesis.speak(u);
-    });
-  }
-
-  function voiceInput(callback, promptText) {
+  // Voice input for Quantity with fast recognition
+  function voiceQtySuggest() {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser');
+      alert('Voice input not supported in this browser.');
       return;
     }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = TTS_LANG;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    speakText(promptText).then(() => recognition.start());
+
+    let handled = false;
+
     recognition.onresult = (event) => {
-      const spoken = event.results[0][0].transcript.trim();
-      callback(spoken);
+      const transcript = event.results[0][0].transcript.trim().toLowerCase();
+      if (!handled) {
+        let qty = parseInt(transcript.match(/\d+/)?.[0] || '', 10);
+        if (!qty) qty = mapWordToNumber(transcript);
+        if (qty && qty > 0) {
+          document.getElementById('quantity').value = qty;
+          speakText(`Quantity set to ${qty}`);
+          handled = true;
+        }
+      }
+      if (event.results[0].isFinal && !handled) {
+        const fallbackQty = parseInt(transcript.match(/\d+/)?.[0] || '1', 10);
+        document.getElementById('quantity').value = fallbackQty;
+        speakText(`Quantity set to ${fallbackQty}`);
+      }
     };
+
     recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
+    recognition.start();
   }
 
-  // Bill Modal and bill building code...
+  // Attach voice listeners for all voice-related buttons
+  function attachVoiceListeners() {
+    const voiceFoodBtn = document.getElementById('voiceInputFood');
+    const voiceQtyBtn = document.getElementById('voiceInputQty');
+    const voiceMobileBtn = document.getElementById('voiceInputMobile');
+    const voiceAddressBtn = document.getElementById('voiceInputAddress');
+
+    if (voiceFoodBtn) voiceFoodBtn.addEventListener('click', voiceFoodSuggest);
+    if (voiceQtyBtn) voiceQtyBtn.addEventListener('click', voiceQtySuggest);
+    if (voiceMobileBtn) voiceMobileBtn.addEventListener('click', () => {
+      voiceInput((val) => {
+        const digits = val.replace(/\D/g, '');
+        if (!digits) {
+          speakText("Couldn't catch a valid number, try again.");
+          return;
+        }
+        document.getElementById('customerMobile').value = digits;
+        speakText(`You said mobile number ${digits.split('').join(' ')}`);
+      }, "Please say your WhatsApp number");
+    });
+    if (voiceAddressBtn) voiceAddressBtn.addEventListener('click', () => {
+      voiceInput((val) => {
+        document.getElementById('customerAddress').value = val;
+        speakText("Address set.");
+      }, "Please say your address");
+    });
+  }
+
+  // Voice synthesis helper
+  function speakText(text) {
+    return new Promise((resolve) => {
+      if (!('speechSynthesis' in window)) return resolve();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = TTS_LANG;
+      utterance.onend = utterance.onerror = resolve;
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  // Voice input helper
+  function voiceInput(callback, promptText) {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice input not supported in this browser.');
+      return;
+    }
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = TTS_LANG;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      callback(event.results[0][0].transcript.trim());
+    };
+    recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
+    speakText(promptText).then(() => recognition.start());
+  }
+
+  // Modal handlers
   if (generateBillBtn) {
     generateBillBtn.addEventListener('click', () => {
       if (!order.length) return alert('Add some food items first');
@@ -329,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     buildBill();
   });
 
+  // Build bill html and display
   function buildBill() {
     const payload = {
       order,
@@ -349,157 +388,289 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildBillHTML({ order, customer, generatedAt }) {
     const rows = order.map(o => {
       const amt = o.qty * (o.price || 0);
-      return `<tr><td style="padding:6px;border:1px solid #ccc;">${escapeHtml(o.name)}</td>
-              <td style="padding:6px;border:1px solid #ccc;">${o.qty}</td>
-              <td style="padding:6px;border:1px solid #ccc;">${currency(o.price)}</td>
-              <td style="padding:6px;border:1px solid #ccc;">${currency(amt)}</td></tr>`;
+      return `<tr>
+        <td style="padding:6px;border:1px solid #ccc;">${escapeHtml(o.name)}</td>
+        <td style="padding:6px;border:1px solid #ccc;">${o.qty}</td>
+        <td style="padding:6px;border:1px solid #ccc;">${currency(o.price)}</td>
+        <td style="padding:6px;border:1px solid #ccc;">${currency(amt)}</td>
+      </tr>`;
     }).join('');
     return `<div style="font-family:Arial;">
-      <h3 style="margin:6px 0;text-align:center;">XYZ Restaurant Bill</h3>
-      <div><strong>Name:</strong> ${escapeHtml(customer.name)} &nbsp;&nbsp; <strong>Email:</strong> ${escapeHtml(customer.email)} &nbsp;&nbsp; <strong>Mobile:</strong> ${escapeHtml(customer.mobile)}</div>
-      <div style="margin-top:8px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead style="background:#2980b9;color:#fff;"><tr><th>Food</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>
-          <tbody>${rows}<tr>
+      <h3 style="text-align:center;margin:10px 0;">XYZ Restaurant Bill</h3>
+      <p><strong>Name:</strong> ${escapeHtml(customer.name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(customer.email)}</p>
+      <p><strong>Mobile:</strong> ${escapeHtml(customer.mobile)}</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+        <thead style="background:#2980b9;color:#fff;">
+          <tr><th>Food</th><th>Qty</th><th>Price</th><th>Amount</th></tr>
+        </thead>
+        <tbody>${rows}
+          <tr>
             <td colspan="3" style="text-align:right;padding:8px;border:1px solid #ccc;"><strong>Total</strong></td>
             <td style="padding:8px;border:1px solid #ccc;"><strong>${currency(calculateTotal(order))}</strong></td>
-          </tr></tbody>
-        </table>
-      </div>
-      <div style="margin-top:12px;text-align:center;color:#666;">Date: ${generatedAt}</div>
+          </tr>
+        </tbody>
+      </table>
+      <p style="text-align:center;color:#666;margin-top:10px;">Date: ${generatedAt}</p>
     </div>`;
   }
 
   function calculateTotal(order) {
-    return order.reduce((s, o) => s + (o.qty * (o.price || 0)), 0);
+    return order.reduce((acc, item) => acc + item.qty * (item.price || 0), 0);
   }
 
-  // Send Bill button handler...
-  if (sendBillBtn) {
-    sendBillBtn.addEventListener('click', async () => {
-      if (!order.length) return alert('No order to send');
-      if (!loggedUser?.whatsapp) return alert('Please enter WhatsApp number first');
+  // Send Bill
+  sendBillBtn.addEventListener('click', async () => {
+    if (!order.length) return alert('No order to send');
+    if (!loggedUser?.whatsapp) return alert('Please enter WhatsApp number');
 
-      const postData = {
-        order,
-        customer: {
-          name: loggedUser.name,
-          email: loggedUser.email,
-          mobile: loggedUser.whatsapp
-        }
-      };
-      sendBillBtn.disabled = true;
-      const originalText = sendBillBtn.textContent;
-      sendBillBtn.textContent = 'Sending...';
-
-      try {
-        const resp = await fetch('/api/send-bill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(postData)
-        });
-        const data = await resp.json();
-        if (resp.ok) alert('Bill sent successfully on WhatsApp and Email');
-        else alert('Failed to send bill: ' + (data.error || 'Unknown error'));
-      } catch (err) {
-        alert('Send Bill error: ' + (err.message || err));
-      } finally {
-        sendBillBtn.disabled = false;
-        sendBillBtn.textContent = originalText || 'Send Bill (WhatsApp / Email)';
+    const postData = {
+      order,
+      customer: {
+        name: loggedUser.name,
+        email: loggedUser.email,
+        mobile: loggedUser.whatsapp
       }
-    });
-  }
+    };
 
-  // Print Bill button handler...
-  if (printBtn) {
-    printBtn.addEventListener('click', () => {
-      if (!billArea.innerHTML.trim()) return alert('No bill to print');
-      const logoSrc = new URL('./logo.jpg', window.location.href).href;
-      const billHtml = `<div style="text-align:center;"><img src="${logoSrc}" style="max-width:120px;margin-bottom:10px;"></div>` + billArea.innerHTML;
-      const win = window.open('', '', 'height=700,width=900');
-      if (!win) return alert('Allow popups for printing');
-      win.document.write('<html><head><title>Bill</title><style>body{font-family:Arial;margin:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #000;padding:8px;text-align:left;}th{background-color:#f2f2f2;}</style></head><body>');
-      win.document.write(billHtml);
-      win.document.write('</body></html>');
-      win.document.close();
-      win.focus();
-      win.print();
-    });
-  }
+    sendBillBtn.disabled = true;
+    const original = sendBillBtn.textContent;
+    sendBillBtn.textContent = 'Sending...';
 
-  // Download PDF button handler...
-  if (downloadPDFBtn) {
-    downloadPDFBtn.addEventListener('click', async () => {
-      if (!billArea.innerHTML.trim()) return alert('No bill to download');
-      if (!window.jspdf) return alert('jsPDF not loaded');
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      try { const logo = await toDataURL('./logo.jpg'); if (logo) doc.addImage(logo, 'JPEG', 80, 10, 50, 20); } catch {}
-      doc.setFontSize(16); doc.text('XYZ Restaurant Bill', doc.internal.pageSize.width / 2, 40, { align: 'center' });
-      const name = loggedUser?.name || '';
-      const email = loggedUser?.email || '';
-      const mobile = loggedUser?.whatsapp || '';
-      let yOffset = 50; doc.setFontSize(12);
-      doc.text(`Name: ${name}`, 14, yOffset);
-      doc.text(`Email: ${email}`, 110, yOffset);
-      doc.text(`Mobile: ${mobile}`, 14, yOffset + 8);
-      doc.setFontSize(10); doc.text(`Date: ${new Date().toLocaleString()}`, 14, yOffset + 16);
-
-      let total = 0;
-      const headers = ["Food", "Qty", "Price", "Amount"];
-      const rows = order.map(o => {
-        const amt = o.qty * (o.price || 0);
-        total += amt;
-        return [o.name, String(o.qty), currency(o.price), currency(amt)];
+    try {
+      const res = await fetch('/api/send-bill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postData)
       });
+      const data = await res.json();
+      if (res.ok) alert('Bill sent successfully!');
+      else alert(`Send failed: ${data.error || 'Unknown error'}`);
+    } catch (err) {
+      alert(`Send error: ${err.message || err}`);
+    } finally {
+      sendBillBtn.disabled = false;
+      sendBillBtn.textContent = original;
+    }
+  });
 
-      if (doc.autoTable) {
-        doc.autoTable({ head: [headers], body: rows, startY: yOffset + 24, theme: 'grid', styles: { halign: 'center', fontSize: 11, cellPadding: 3 }, headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255] } });
-        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : yOffset + 24;
-        doc.setFontSize(12); doc.text(`Total: ${currency(total)}`, doc.internal.pageSize.width - 14, finalY + 10, { align: 'right' });
-      } else {
-        let y = yOffset + 30;
-        rows.forEach(r => {
-          doc.text(r.join(' | '), 14, y);
-          y += 8;
-        });
-        doc.text(`Total: ${currency(total)}`, doc.internal.pageSize.width - 14, y + 6, { align: 'right' });
-      }
-      doc.setFontSize(10); doc.text('Thank you for visiting! Come again.', doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
-      doc.save('bill.pdf');
-    });
-  }
+  // Print Bill
+  printBtn.addEventListener('click', () => {
+    if (!billArea.innerHTML.trim()) return alert('No bill to print');
+    const logoSrc = new URL('./logo.jpg', window.location.href).href;
+    const win = window.open('', '', 'width=900,height=700');
+    if (!win) return alert('Allow popups for printing');
+    win.document.write(`
+      <html>
+      <head><title>Print Bill</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #2980b9; color: white; }
+      </style>
+      </head>
+      <body>
+        <div style="text-align:center;">
+          <img src="${logoSrc}" alt="Logo" style="max-width:120px;margin-bottom:10px;" />
+        </div>
+        ${billArea.innerHTML}
+      </body></html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+  });
 
-  // Helper: Convert image URL to base64 for PDF logo
+  // Download PDF
+  downloadPDFBtn.addEventListener('click', async () => {
+    if (!billArea.innerHTML.trim()) return alert('No bill to download');
+    if (!window.jspdf) return alert('jsPDF not loaded');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    try {
+      const logo = await toDataURL('./logo.jpg');
+      if (logo) doc.addImage(logo, 'JPEG', 80, 10, 50, 20);
+    } catch {}
+    doc.setFontSize(16);
+    doc.text('XYZ Restaurant Bill', doc.internal.pageSize.getWidth() / 2, 40, { align: 'center' });
+    const name = loggedUser?.name || '';
+    const email = loggedUser?.email || '';
+    const mobile = loggedUser?.whatsapp || '';
+    let yOffset = 50;
+    doc.setFontSize(12);
+    doc.text(`Name: ${name}`, 14, yOffset);
+    doc.text(`Email: ${email}`, 110, yOffset);
+    doc.text(`Mobile: ${mobile}`, 14, yOffset + 10);
+    doc.text(`Date: ${new Date().toLocaleString()}`, 14, yOffset + 20);
+
+    const columns = ["Food", "Qty", "Price", "Amount"];
+    const rows = order.map(item => [
+      item.name,
+      String(item.qty),
+      currency(item.price),
+      currency(item.qty * item.price)
+    ]);
+    doc.autoTable({ head: [columns], body: rows, startY: yOffset + 30, theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255] },
+      styles: { halign: 'center' } });
+
+    const finalY = doc.lastAutoTable.finalY;
+    doc.setFontSize(12);
+    doc.text(`Total: ${currency(calculateTotal(order))}`, doc.internal.pageSize.getWidth() - 20, finalY + 10, { align: 'right' });
+    doc.setFontSize(10);
+    doc.text('Thank you for visiting! Come again.', doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+
+    doc.save('bill.pdf');
+  });
+
   async function toDataURL(url) {
     try {
-      const resp = await fetch(url, { mode: 'cors' });
-      if (!resp.ok) throw new Error('Fetch failed');
-      const blob = await resp.blob();
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch image');
+      const blob = await res.blob();
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
+        reader.onerror = () => reject(null);
         reader.readAsDataURL(blob);
       });
     } catch {
-      return new Promise(resolve => {
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.onload = function () {
-          try {
-            const canvas = document.createElement('canvas'); 
-            canvas.width = this.width; canvas.height = this.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(this, 0, 0);
-            resolve(canvas.toDataURL('image/jpeg'));
-          } catch {
-            resolve(null);
-          }
-        };
-        img.onerror = () => resolve(null);
-        img.src = url;
-      });
+      return null;
     }
   }
+
+  // Voice input helper
+  function voiceInput(callback, promptText) {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice input not supported in this browser.');
+      return;
+    }
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = TTS_LANG;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript.trim();
+      callback(transcript);
+    };
+
+    recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
+
+    speakText(promptText).then(() => recognition.start());
+  }
+
+  // Attach voice button event listeners
+  function attachVoiceListeners() {
+    const foodVoiceBtn = document.getElementById('voiceInputFood');
+    const qtyVoiceBtn = document.getElementById('voiceInputQty');
+    const mobileVoiceBtn = document.getElementById('voiceInputMobile');
+    const addressVoiceBtn = document.getElementById('voiceInputAddress');
+
+    if (foodVoiceBtn) foodVoiceBtn.addEventListener('click', voiceFoodSuggest);
+    if (qtyVoiceBtn) qtyVoiceBtn.addEventListener('click', voiceQtySuggest);
+    if (mobileVoiceBtn) mobileVoiceBtn.addEventListener('click', () => {
+      voiceInput(val => {
+        const digits = val.replace(/\D/g, '');
+        if (!digits) {
+          speakText("Couldn't catch valid number, try again.");
+          return;
+        }
+        document.getElementById('customerMobile').value = digits;
+        speakText(`You said mobile number ${digits.split('').join(' ')}`);
+      }, 'Please say your WhatsApp number (digits only)');
+    });
+    if (addressVoiceBtn) addressVoiceBtn.addEventListener('click', () => {
+      voiceInput(val => {
+        document.getElementById('customerAddress').value = val;
+        speakText("Address set.");
+      }, 'Please say your address');
+    });
+  }
+
+  function speakText(text) {
+    return new Promise(resolve => {
+      if (!('speechSynthesis' in window)) return resolve();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = TTS_LANG;
+      utterance.onend = utterance.onerror = resolve;
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  // Voice input for Food Name with prefix filter suggestions
+  function voiceFoodSuggest() {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice input not supported.');
+      return;
+    }
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = TTS_LANG;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    let firstLetterHandled = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.trim();
+      if (transcript && !firstLetterHandled) {
+        const letter = transcript[0].toLowerCase();
+        loadFoods(letter);
+        firstLetterHandled = true;
+      }
+      if (event.results[0].isFinal) {
+        document.getElementById('food_name').value = transcript;
+        speakText(`You said ${transcript}`);
+      }
+    };
+
+    recognition.onerror = () => speakText('Sorry, could not understand. Please try again.');
+    recognition.start();
+  }
+
+  // Voice input for Quantity with spoken words mapping
+  function mapWordToNumber(word) {
+    const map = {
+      zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+      six: 6, seven: 7, eight: 8, nine: 9, ten: 10
+    };
+    return map[word.toLowerCase()] ?? null;
+  }
+
+  function voiceQtySuggest() {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice input not supported.');
+      return;
+    }
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = TTS_LANG;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    let handled = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.trim().toLowerCase();
+      if (!handled) {
+        let qty = parseInt(transcript.match(/\d+/)?.[0] || '', 10);
+        if (!qty) qty = mapWordToNumber(transcript);
+        if (qty && qty > 0) {
+          document.getElementById('quantity').value = qty;
+          speakText(`Quantity set to ${qty}`);
+          handled = true;
+        }
+      }
+      if (event.results[0].isFinal && !handled) {
+        const fallbackQty = parseInt(transcript.match(/\d+/)?.[0] || '1', 10);
+        document.getElementById('quantity').value = fallbackQty;
+        speakText(`Quantity set to ${fallbackQty}`);
+      }
+    };
+    recognition.onerror = () => speakText("Sorry, couldn't understand. Try again.");
+    recognition.start();
+  }
+
+  attachVoiceListeners();
+
+  // Add any additional handlers for bill generation, sending, printing, downloading as needed
+
 });
