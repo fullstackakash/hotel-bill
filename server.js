@@ -55,15 +55,23 @@ const billSchema = new mongoose.Schema({
 const Food = mongoose.model('Food', foodSchema);
 const Bill = mongoose.model('Bill', billSchema);
 
+// Updated /api/foods route with startsWith filtering
 app.get('/api/foods', async (req, res) => {
   try {
-    const foods = await Food.find().sort({ food_name: 1 });
+    const { startsWith } = req.query;
+    let query = {};
+    if(startsWith) {
+      query = { food_name: new RegExp('^' + startsWith, 'i') };
+    }
+    const foods = await Food.find(query).sort({ food_name: 1 });
     res.json(foods);
   } catch (error) {
     console.error('Error fetching foods:', error);
     res.status(500).json({ error: 'Failed to fetch foods' });
   }
 });
+
+// Rest of your existing routes (send-bill, bills/:id, etc.) remain unchanged
 
 app.post('/api/send-bill', async (req, res) => {
   try {

@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const userInfoModal = document.getElementById('userInfoModal');
   const userInfoForm = document.getElementById('userInfoForm');
   const cancelUserInfoBtn = document.getElementById('cancelUserInfo');
-  
+
   let foodPrices = {};
   let order = [];
   let loggedUser = null;
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     userInfoDisplay.style.display = 'block';
     userNameSpan.textContent = user.name || '';
     userEmailSpan.textContent = user.email || '';
-    attachVoiceListeners(); // Voice event listeners are attached here!
+    attachVoiceListeners();
   }
   function enableBillActions() {
     generateBillBtn.disabled = false;
@@ -198,18 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableBillActions();
   }
 
-  // Voice Input Implementation
-  function speakText(text) {
-    return new Promise(resolve => {
-      if (!('speechSynthesis' in window)) return resolve();
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = TTS_LANG;
-      u.onend = u.onerror = () => resolve();
-      window.speechSynthesis.speak(u);
-    });
-  }
-  function voiceInput(callback, promptText) {
+  // Voice Food Input with instant suggestion
+  function voiceFoodSuggest() {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       alert('Voice input not supported in this browser');
       return;
@@ -217,29 +207,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = TTS_LANG;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    speakText(promptText).then(() => recognition.start());
+    let firstLetterHandled = false;
+
     recognition.onresult = (event) => {
-      const spoken = event.results[0][0].transcript.trim();
-      callback(spoken);
+      const transcript = event.results[0][0].transcript.trim();
+      if (transcript && !firstLetterHandled) {
+        const letter = transcript[0].toLowerCase();
+        fetch(`/api/foods?startsWith=${letter}`)
+          .then(resp => resp.json())
+          .then(list => populateFoods(list));
+        firstLetterHandled = true;
+      }
+      if (event.results[0].isFinal) {
+        document.getElementById('food_name').value = transcript;
+        speakText(`You said ${transcript}`);
+      }
     };
+
     recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
+    recognition.start();
   }
 
-  // Voice Listeners Attach Function -- THIS IS IMPORTANT FOR GOOGLE LOGIN
+  // Attach voice listeners to buttons
   function attachVoiceListeners() {
     const voiceFoodBtn = document.getElementById('voiceInputFood');
     const voiceQtyBtn = document.getElementById('voiceInputQty');
     const voiceMobileBtn = document.getElementById('voiceInputMobile');
     const voiceAddressBtn = document.getElementById('voiceInputAddress');
     if (voiceFoodBtn) {
-      voiceFoodBtn.addEventListener('click', () => {
-        voiceInput(val => {
-          document.getElementById('food_name').value = val;
-          speakText(`You said ${val}`);
-        }, 'Please say the food name');
-      });
+      voiceFoodBtn.addEventListener('click', voiceFoodSuggest);
     }
     if (voiceQtyBtn) {
       voiceQtyBtn.addEventListener('click', () => {
@@ -273,7 +271,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Bill Modal
+  function speakText(text) {
+    return new Promise(resolve => {
+      if (!('speechSynthesis' in window)) return resolve();
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = TTS_LANG;
+      u.onend = u.onerror = () => resolve();
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  function voiceInput(callback, promptText) {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice input not supported in this browser');
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = TTS_LANG;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    speakText(promptText).then(() => recognition.start());
+    recognition.onresult = (event) => {
+      const spoken = event.results[0][0].transcript.trim();
+      callback(spoken);
+    };
+    recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
+  }
+
+  // Bill Modal and bill building code...
   if (generateBillBtn) {
     generateBillBtn.addEventListener('click', () => {
       if (!order.length) return alert('Add some food items first');
@@ -302,7 +329,6 @@ document.addEventListener('DOMContentLoaded', () => {
     buildBill();
   });
 
-  // Bill Build
   function buildBill() {
     const payload = {
       order,
@@ -319,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBillBtn.disabled = false;
     speakText(`Bill generated for ${loggedUser.name}. Total amount ${calculateTotal(order)} rupees.`);
   }
+
   function buildBillHTML({ order, customer, generatedAt }) {
     const rows = order.map(o => {
       const amt = o.qty * (o.price || 0);
@@ -342,11 +369,12 @@ document.addEventListener('DOMContentLoaded', () => {
       <div style="margin-top:12px;text-align:center;color:#666;">Date: ${generatedAt}</div>
     </div>`;
   }
+
   function calculateTotal(order) {
     return order.reduce((s, o) => s + (o.qty * (o.price || 0)), 0);
   }
 
-  // Send Bill
+  // Send Bill button handler...
   if (sendBillBtn) {
     sendBillBtn.addEventListener('click', async () => {
       if (!order.length) return alert('No order to send');
@@ -382,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Print
+  // Print Bill button handler...
   if (printBtn) {
     printBtn.addEventListener('click', () => {
       if (!billArea.innerHTML.trim()) return alert('No bill to print');
@@ -399,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Download PDF
+  // Download PDF button handler...
   if (downloadPDFBtn) {
     downloadPDFBtn.addEventListener('click', async () => {
       if (!billArea.innerHTML.trim()) return alert('No bill to download');
@@ -442,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Convert Image to Base64 (for PDF logo)
+  // Helper: Convert image URL to base64 for PDF logo
   async function toDataURL(url) {
     try {
       const resp = await fetch(url, { mode: 'cors' });
@@ -456,12 +484,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } catch {
       return new Promise(resolve => {
-        const img = new Image(); img.crossOrigin = "Anonymous"; img.onload = function () {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = function () {
           try {
-            const canvas = document.createElement('canvas'); canvas.width = this.width; canvas.height = this.height;
-            const ctx = canvas.getContext('2d'); ctx.drawImage(this, 0, 0);
+            const canvas = document.createElement('canvas'); 
+            canvas.width = this.width; canvas.height = this.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(this, 0, 0);
             resolve(canvas.toDataURL('image/jpeg'));
-          } catch { resolve(null); }
+          } catch {
+            resolve(null);
+          }
         };
         img.onerror = () => resolve(null);
         img.src = url;
