@@ -20,16 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const userInfoModal = document.getElementById('userInfoModal');
   const userInfoForm = document.getElementById('userInfoForm');
   const cancelUserInfoBtn = document.getElementById('cancelUserInfo');
-  const voiceFoodBtn = document.getElementById('voiceInputFood');
-  const voiceQtyBtn = document.getElementById('voiceInputQty');
-const voiceMobileBtn = document.getElementById('voiceInputMobile');
-  const voiceAddressBtn = document.getElementById('voiceInputAddress');
-
+  
   let foodPrices = {};
   let order = [];
   let loggedUser = null;
 
-  // ===== LocalStorage Helpers =====
+  // LocalStorage Helpers
   function saveUser(user) {
     localStorage.setItem('loggedUser', JSON.stringify(user));
   }
@@ -41,11 +37,11 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
   function logoutUser() {
     localStorage.removeItem('loggedUser');
     loggedUser = null;
-    google.accounts.id.disableAutoSelect?.(); // Prevent auto-login
+    google.accounts.id.disableAutoSelect?.();
     showLoginUI();
   }
 
-  // ===== UI Control =====
+  // UI Control
   function showLoginUI() {
     loginContainer.style.display = 'block';
     billingContainer.style.display = 'none';
@@ -61,6 +57,7 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     userInfoDisplay.style.display = 'block';
     userNameSpan.textContent = user.name || '';
     userEmailSpan.textContent = user.email || '';
+    attachVoiceListeners(); // Voice event listeners are attached here!
   }
   function enableBillActions() {
     generateBillBtn.disabled = false;
@@ -73,10 +70,12 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     sendBillBtn.disabled = true;
   }
   function escapeHtml(text) {
-    return text ? String(text).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m])) : '';
+    return text ? String(text).replace(/[&<>"']/g, m => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"'"}[m]
+    )) : '';
   }
 
-  // ===== Google Sign-In callback =====
+  // Google Sign-In callback
   window.handleCredentialResponse = (response) => {
     try {
       const base64Url = response.credential.split('.')[1];
@@ -97,7 +96,7 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
 
   logoutBtn.addEventListener('click', () => logoutUser());
 
-  // ===== Load user if already logged in =====
+  // Load user if already logged in
   loggedUser = loadUser();
   if (loggedUser) {
     showBillingUI(loggedUser);
@@ -106,7 +105,7 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     showLoginUI();
   }
 
-  // ===== Load Foods =====
+  // Load Foods
   async function loadFoods() {
     try {
       const resp = await fetch('/api/foods');
@@ -115,7 +114,6 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
       if (!Array.isArray(data)) throw new Error('Invalid foods data');
       populateFoods(data);
     } catch (err) {
-      console.warn('loadFoods failed, using fallback:', err);
       const fallback = [
         { food_name: 'Tea', price: 20 },
         { food_name: 'Coffee', price: 40 },
@@ -140,7 +138,7 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     });
   }
 
-  // ===== Order Management =====
+  // Order Management
   orderForm.addEventListener('submit', (e) => {
     e.preventDefault();
     addOrderItem();
@@ -163,7 +161,11 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
   }
 
   function renderOrder() {
-    if (!order.length) { orderList.innerHTML = '<p>No items yet.</p>'; disableBillActions(); return; }
+    if (!order.length) {
+      orderList.innerHTML = '<p>No items yet.</p>';
+      disableBillActions();
+      return;
+    }
     let total = 0;
     let html = `<h4>Your Order</h4><table style="border-collapse:collapse;width:100%;text-align:center;font-family:Arial;font-size:14px;">
       <thead style="background:#2980b9;color:#fff;"><tr><th>Food</th><th>Qty</th><th>Price</th><th>Amount</th><th>Action</th></tr></thead><tbody>`;
@@ -196,7 +198,7 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     enableBillActions();
   }
 
-  // ===== Voice Input =====
+  // Voice Input Implementation
   function speakText(text) {
     return new Promise(resolve => {
       if (!('speechSynthesis' in window)) return resolve();
@@ -224,26 +226,54 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     };
     recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
   }
-  if (voiceFoodBtn) {
-    voiceFoodBtn.addEventListener('click', () => {
-      voiceInput(val => {
-        const el = document.getElementById('food_name');
-        el.value = val;
-        speakText(`You said ${val}`);
-      }, 'Please say the food name');
-    });
-  }
-  if (voiceQtyBtn) {
-    voiceQtyBtn.addEventListener('click', () => {
-      voiceInput(val => {
-        const qty = parseInt(val.match(/\d+/)?.[0] || '1', 10);
-        document.getElementById('quantity').value = qty;
-        speakText(`Quantity set to ${qty}`);
-      }, 'Please say the quantity');
-    });
+
+  // Voice Listeners Attach Function -- THIS IS IMPORTANT FOR GOOGLE LOGIN
+  function attachVoiceListeners() {
+    const voiceFoodBtn = document.getElementById('voiceInputFood');
+    const voiceQtyBtn = document.getElementById('voiceInputQty');
+    const voiceMobileBtn = document.getElementById('voiceInputMobile');
+    const voiceAddressBtn = document.getElementById('voiceInputAddress');
+    if (voiceFoodBtn) {
+      voiceFoodBtn.addEventListener('click', () => {
+        voiceInput(val => {
+          document.getElementById('food_name').value = val;
+          speakText(`You said ${val}`);
+        }, 'Please say the food name');
+      });
+    }
+    if (voiceQtyBtn) {
+      voiceQtyBtn.addEventListener('click', () => {
+        voiceInput(val => {
+          const qty = parseInt(val.match(/\d+/)?.[0] || '1', 10);
+          document.getElementById('quantity').value = qty;
+          speakText(`Quantity set to ${qty}`);
+        }, 'Please say the quantity');
+      });
+    }
+    if (voiceMobileBtn) {
+      voiceMobileBtn.addEventListener('click', () => {
+        voiceInput(val => {
+          const digits = val.replace(/\D/g, '');
+          if (!digits) {
+            speakText("I couldn't catch a valid number, please try again.");
+            return;
+          }
+          document.getElementById('customerMobile').value = digits;
+          speakText(`You said mobile number ${digits.split('').join(' ')}`);
+        }, 'Please say your WhatsApp number in digits');
+      });
+    }
+    if (voiceAddressBtn) {
+      voiceAddressBtn.addEventListener('click', () => {
+        voiceInput(val => {
+          document.getElementById('customerAddress').value = val;
+          speakText(`Address set as: ${val}`);
+        }, 'Please say your address');
+      });
+    }
   }
 
-  // ===== Bill Modal =====
+  // Bill Modal
   if (generateBillBtn) {
     generateBillBtn.addEventListener('click', () => {
       if (!order.length) return alert('Add some food items first');
@@ -272,7 +302,7 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
     buildBill();
   });
 
-  // ===== Bill Build =====
+  // Bill Build
   function buildBill() {
     const payload = {
       order,
@@ -315,32 +345,8 @@ const voiceMobileBtn = document.getElementById('voiceInputMobile');
   function calculateTotal(order) {
     return order.reduce((s, o) => s + (o.qty * (o.price || 0)), 0);
   }
-if (voiceMobileBtn) {
-    voiceMobileBtn.addEventListener('click', () => {
-      voiceInput(val => {
-        // Sirf digits nikalne ke liye regex
-        const digits = val.replace(/\D/g, '');
-        if (!digits) {
-          speakText("I couldn't catch a valid number, please try again.");
-          return;
-        }
-        const el = document.getElementById('customerMobile');
-        el.value = digits;
-        speakText(`You said mobile number ${digits.split('').join(' ')}`);
-      }, 'Please say your WhatsApp number in digits');
-    });
-  }
 
-  if (voiceAddressBtn) {
-    voiceAddressBtn.addEventListener('click', () => {
-      voiceInput(val => {
-        const el = document.getElementById('customerAddress');
-        el.value = val;
-        speakText(`Address set as: ${val}`);
-      }, 'Please say your address');
-    });
-  }
-  // ===== Send Bill =====
+  // Send Bill
   if (sendBillBtn) {
     sendBillBtn.addEventListener('click', async () => {
       if (!order.length) return alert('No order to send');
@@ -376,7 +382,7 @@ if (voiceMobileBtn) {
     });
   }
 
-  // ===== Print =====
+  // Print
   if (printBtn) {
     printBtn.addEventListener('click', () => {
       if (!billArea.innerHTML.trim()) return alert('No bill to print');
@@ -393,7 +399,7 @@ if (voiceMobileBtn) {
     });
   }
 
-  // ===== Download PDF =====
+  // Download PDF
   if (downloadPDFBtn) {
     downloadPDFBtn.addEventListener('click', async () => {
       if (!billArea.innerHTML.trim()) return alert('No bill to download');
@@ -424,7 +430,6 @@ if (voiceMobileBtn) {
         const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : yOffset + 24;
         doc.setFontSize(12); doc.text(`Total: ${currency(total)}`, doc.internal.pageSize.width - 14, finalY + 10, { align: 'right' });
       } else {
-        // fallback
         let y = yOffset + 30;
         rows.forEach(r => {
           doc.text(r.join(' | '), 14, y);
@@ -437,7 +442,7 @@ if (voiceMobileBtn) {
     });
   }
 
-  // ===== Helper: Convert Image to Base64 =====
+  // Convert Image to Base64 (for PDF logo)
   async function toDataURL(url) {
     try {
       const resp = await fetch(url, { mode: 'cors' });
