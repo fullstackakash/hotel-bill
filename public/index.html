@@ -80,7 +80,7 @@
     <div id="billArea" style="margin-top:1em;"></div>
   </div>
 
-  <!-- User Info Modal -->
+  <!-- User Info Modal (unchanged) -->
   <div id="userInfoModal" aria-hidden="true" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;">
     <div role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="background:#fff;padding:2em;border-radius:15px;max-width:400px;margin:auto;box-shadow:0 0 20px rgba(0,0,0,0.25);">
       <h3 id="modalTitle" style="margin-top:0;">Enter Your Details</h3>
@@ -98,10 +98,9 @@
 
   <script src="./app.js"></script>
 
-  <!-- Google Login Init -->
   <script>
     function handleCredentialResponse(response) {
-      // On successful login, hide login container & show logout button and billing
+      // On successful Google login, hide login and show bill + logout
       document.getElementById("loginContainer").style.display = "none";
       document.getElementById("userInfoDisplay").style.display = "block";
       document.getElementById("billingContainer").style.display = "block";
@@ -119,11 +118,10 @@
       );
     };
 
-    // Optional logout button logic (reload page or implement sign-out)
     document.addEventListener('DOMContentLoaded', function () {
       const logoutBtn = document.getElementById('logoutBtn');
       logoutBtn.addEventListener('click', () => {
-        window.location.reload(); // Reload page to simulate logout, customize as needed
+        window.location.reload(); // Simple logout by reload, customize if needed
       });
     });
   </script>
