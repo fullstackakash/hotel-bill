@@ -224,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     recognition.start();
   }
 
-  // Mapping words to numbers for quantity voice input
+  // Map words to numbers for quantity voice input
   function mapWordToNumber(word) {
     const mapping = {
       zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
@@ -289,55 +289,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = TTS_LANG;
-    recognition.interimResults = true;
+    recognition.interimResults = false; // changed to false to avoid truncation
     recognition.maxAlternatives = 1;
 
-    let finalTranscript = '';
-    let isProcessing = false;
-
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
-
-      const combinedTranscript = (finalTranscript + interimTranscript).trim();
-      const digits = combinedTranscript.replace(/\D/g, '');
-
-      if (digits.length > 0) {
-        document.getElementById('customerMobile').value = digits.slice(0, 15);
-      }
-
-      if (event.results[event.results.length - 1].isFinal) {
+      if (event.results.length > 0 && event.results[0].isFinal) {
+        const transcript = event.results[0][0].transcript;
+        const digits = transcript.replace(/\D/g, '').slice(0, 15); // max length 15 digits
         if (digits.length >= 7 && digits.length <= 15) {
-          isProcessing = true;
-          speakText(`You said mobile number ${digits.split('').join(' ')}`).then(() => {
-            recognition.stop();
-          });
+          document.getElementById('customerMobile').value = digits;
+          speakText(`You said mobile number ${digits.split('').join(' ')}`);
+          recognition.stop();
         } else {
           speakText('Please say a valid number with 7 to 15 digits. Try again.');
-          finalTranscript = '';
           document.getElementById('customerMobile').value = '';
-          setTimeout(() => {
-            if (!isProcessing) recognition.start();
-          }, 1500);
+          recognition.stop();
+          setTimeout(() => recognition.start(), 1500);
         }
       }
     };
 
     recognition.onerror = () => {
       speakText("Sorry, I couldn't understand. Please try again.");
-      finalTranscript = '';
       document.getElementById('customerMobile').value = '';
-      if (!isProcessing) recognition.start();
+      recognition.stop();
+      setTimeout(() => recognition.start(), 1500);
     };
 
     recognition.onend = () => {
-      if (!isProcessing) {
+      if (!document.getElementById('customerMobile').value) {
         speakText("I didn't catch that. Please say your WhatsApp number.");
         recognition.start();
       }
@@ -474,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Print bill
+  // Print Bill
   printBtn.addEventListener('click', () => {
     if (!billArea.innerHTML.trim()) return alert('No bill to print');
     const logoSrc = new URL('./logo.jpg', window.location.href).href;
@@ -540,11 +520,11 @@ document.addEventListener('DOMContentLoaded', () => {
     doc.text(`Total: ${currency(calculateTotal(order))}`, doc.internal.pageSize.getWidth() - 20, finalY + 10, { align: 'right' });
     doc.setFontSize(10);
     doc.text('Thank you for visiting! Come again.', doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
-
+ 
     doc.save('bill.pdf');
   });
 
-  // Utility function to convert image to base64
+  // Utility: convert image to base64 data URL
   async function toDataURL(url) {
     try {
       const res = await fetch(url);
