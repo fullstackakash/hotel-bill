@@ -287,55 +287,90 @@ document.addEventListener('DOMContentLoaded', () => {
     const voiceFoodBtn = document.getElementById('voiceInputFood');
     const voiceQtyBtn = document.getElementById('voiceInputQty');
     const voiceMobileBtn = document.getElementById('voiceInputMobile');
-    const voiceAddressBtn = document.getElementById('voiceInputAddress');
 
     if (voiceFoodBtn) voiceFoodBtn.addEventListener('click', voiceFoodSuggest);
     if (voiceQtyBtn) voiceQtyBtn.addEventListener('click', voiceQtySuggest);
     if (voiceMobileBtn) voiceMobileBtn.addEventListener('click', () => {
-      voiceInput((val) => {
-        const digits = val.replace(/\D/g, '');
-        if (!digits) {
-          speakText("Couldn't catch a valid number, try again.");
-          return;
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        alert('Voice input not supported in this browser.');
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+
+      recognition.lang = TTS_LANG;
+      recognition.interimResults = true; // Real-time interim results
+      recognition.maxAlternatives = 1;
+
+      let finalTranscript = '';
+      let isProcessing = false;
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
         }
-        document.getElementById('customerMobile').value = digits;
-        speakText(`You said mobile number ${digits.split('').join(' ')}`);
-      }, "Please say your WhatsApp number");
-    });
-    if (voiceAddressBtn) voiceAddressBtn.addEventListener('click', () => {
-      voiceInput((val) => {
-        document.getElementById('customerAddress').value = val;
-        speakText("Address set.");
-      }, "Please say your address");
+
+        const combinedTranscript = (finalTranscript + interimTranscript).trim();
+
+        // Extract digits only
+        const digits = combinedTranscript.replace(/\D/g, '');
+
+        // Update input field in real time but only if digits present
+        if (digits.length > 0) {
+          document.getElementById('customerMobile').value = digits;
+        }
+
+        // If final result arrived and digits length in range, confirm & stop recognition
+        if (event.results[event.results.length - 1].isFinal) {
+          if (digits.length >= 7 && digits.length <= 15) {
+            isProcessing = true;
+            speakText(`You said mobile number ${digits.split('').join(' ')}`).then(() => {
+              recognition.stop();
+            });
+          } else {
+            speakText('Please say a valid number with 7 to 15 digits. Try again.');
+            finalTranscript = '';
+            document.getElementById('customerMobile').value = '';
+            setTimeout(() => {
+              if (!isProcessing) recognition.start();
+            }, 1500);
+          }
+        }
+      };
+
+      recognition.onerror = () => {
+        speakText("Sorry, I couldn't understand. Please try again.");
+        finalTranscript = '';
+        document.getElementById('customerMobile').value = '';
+        if (!isProcessing) recognition.start();
+      };
+
+      recognition.onend = () => {
+        if (!isProcessing) {
+          speakText("I didn't catch that. Please say your WhatsApp number.");
+          recognition.start();
+        }
+      };
+
+      speakText("Please say your WhatsApp number, digit by digit.").then(() => {
+        recognition.start();
+      });
     });
   }
 
-  // Voice synthesis helper
   function speakText(text) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       if (!('speechSynthesis' in window)) return resolve();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = TTS_LANG;
       utterance.onend = utterance.onerror = resolve;
       window.speechSynthesis.speak(utterance);
     });
-  }
-
-  // Voice input helper
-  function voiceInput(callback, promptText) {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser.');
-      return;
-    }
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = TTS_LANG;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event) => {
-      callback(event.results[0][0].transcript.trim());
-    };
-    recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
-    speakText(promptText).then(() => recognition.start());
   }
 
   // Modal handlers
@@ -539,132 +574,4 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
   }
-
-  // Voice input helper
-  function voiceInput(callback, promptText) {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser.');
-      return;
-    }
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = TTS_LANG;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript.trim();
-      callback(transcript);
-    };
-
-    recognition.onerror = () => speakText('Sorry, I could not understand. Please try again.');
-
-    speakText(promptText).then(() => recognition.start());
-  }
-
-  // Attach voice button event listeners
-
-function attachVoiceListeners() {
-  const voiceFoodBtn = document.getElementById('voiceInputFood');
-  const voiceQtyBtn = document.getElementById('voiceInputQty');
-  const voiceMobileBtn = document.getElementById('voiceInputMobile');
-
-  if (voiceFoodBtn) voiceFoodBtn.addEventListener('click', voiceFoodSuggest);
-  if (voiceQtyBtn) voiceQtyBtn.addEventListener('click', voiceQtySuggest);
-  if (voiceMobileBtn) voiceMobileBtn.addEventListener('click', () => {
-    voiceInput((val) => {
-      const digits = val.replace(/\D/g, '');
-      if (!digits) {
-        speakText("Couldn't catch a valid number, try again.");
-        return;
-      }
-      document.getElementById('customerMobile').value = digits;
-      speakText(`You said mobile number ${digits.split('').join(' ')}`);
-    }, "Please say your WhatsApp number");
-  });
-}
-
-  function speakText(text) {
-    return new Promise(resolve => {
-      if (!('speechSynthesis' in window)) return resolve();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = TTS_LANG;
-      utterance.onend = utterance.onerror = resolve;
-      window.speechSynthesis.speak(utterance);
-    });
-  }
-
-  // Voice input for Food Name with prefix filter suggestions
-  function voiceFoodSuggest() {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported.');
-      return;
-    }
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = TTS_LANG;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    let firstLetterHandled = false;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript.trim();
-      if (transcript && !firstLetterHandled) {
-        const letter = transcript[0].toLowerCase();
-        loadFoods(letter);
-        firstLetterHandled = true;
-      }
-      if (event.results[0].isFinal) {
-        document.getElementById('food_name').value = transcript;
-        speakText(`You said ${transcript}`);
-      }
-    };
-
-    recognition.onerror = () => speakText('Sorry, could not understand. Please try again.');
-    recognition.start();
-  }
-
-  // Voice input for Quantity with spoken words mapping
-  function mapWordToNumber(word) {
-    const map = {
-      zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
-      six: 6, seven: 7, eight: 8, nine: 9, ten: 10
-    };
-    return map[word.toLowerCase()] ?? null;
-  }
-
-  function voiceQtySuggest() {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported.');
-      return;
-    }
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = TTS_LANG;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    let handled = false;
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript.trim().toLowerCase();
-      if (!handled) {
-        let qty = parseInt(transcript.match(/\d+/)?.[0] || '', 10);
-        if (!qty) qty = mapWordToNumber(transcript);
-        if (qty && qty > 0) {
-          document.getElementById('quantity').value = qty;
-          speakText(`Quantity set to ${qty}`);
-          handled = true;
-        }
-      }
-      if (event.results[0].isFinal && !handled) {
-        const fallbackQty = parseInt(transcript.match(/\d+/)?.[0] || '1', 10);
-        document.getElementById('quantity').value = fallbackQty;
-        speakText(`Quantity set to ${fallbackQty}`);
-      }
-    };
-    recognition.onerror = () => speakText("Sorry, couldn't understand. Try again.");
-    recognition.start();
-  }
-
-  attachVoiceListeners();
-
-  // Add any additional handlers for bill generation, sending, printing, downloading as needed
-
 });
