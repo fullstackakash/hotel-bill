@@ -234,24 +234,42 @@ body.dark-mode button {
   color: #fff;
 }
 /* Existing @media queries remain intact */
-
-/* New styles for userInfoDisplay and billingContainer on small screens */
 @media (max-width: 600px) {
   #userInfoDisplay {
-    font-size: 12px;
-    margin: 5px 10px;
+    display: flex !important; /* force visible and flex for layout */
+    justify-content: center; /* center horizontally */
+    align-items: center; /* vertical center */
+    font-size: 14px !important;
+    margin: 5px auto !important;
+    padding: 5px 10px;
+    max-width: 100vw;
+    background: #fff; /* optional: add background for visibility */
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    white-space: nowrap;
+  }
+  #billingContainer {
+    margin-top: 50px !important; /* space below fixed user info */
+    max-width: 100% !important;
+    padding: 1rem 0.5rem !important;
+  }
+}
+@media (max-width: 400px) {
+  #userInfoDisplay {
+    font-size: 12px !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 40vw; /* restrict width for user info on mobile */
-  }
-
-  #billingContainer {
-    max-width: 100% !important; /* override max-width for full width */
-    margin: 0 auto;
-    padding: 1rem 0.5rem;
+    max-width: 100vw;
   }
 }
+
+
 @media (max-width: 400px) {
   #userInfoDisplay {
     display: none; /* hide to give full focus to billing UI */
