@@ -19,8 +19,6 @@
     #userInfoDisplay {
       text-align: right;
       margin: 10px 20px;
-      font-weight: bold;
-      font-size: 14px;
     }
     #loginContainer {
       max-width: 400px;
@@ -32,9 +30,7 @@
       background: white;
     }
     #logoutBtn {
-      margin-left: 10px;
       padding: 6px 12px;
-      font-weight: normal;
       cursor: pointer;
       background-color: #e74c3c;
       border: none;
@@ -48,30 +44,31 @@
 
   <div id="loginContainer">
     <h2>Please Login</h2>
-    <!-- Google Sign-in Button (rendered via JS) -->
     <div class="g_id_signin"></div>
   </div>
 
   <div id="userInfoDisplay" style="display:none;">
-    Welcome <span id="userName"></span> (<span id="userEmail"></span>)
     <button id="logoutBtn">Logout</button>
   </div>
 
   <div id="billingContainer" class="container" role="main" style="max-width:900px;margin:0 auto;padding:1rem; display:none;">
     <h2>Food Billing System</h2>
     <form id="orderForm" autocomplete="off">
-      <label for="food_name">Food Name:</label><br>
+      <label for="food_name">Food Name:</label><br />
       <input list="foods" id="food_name" name="food_name" required aria-describedby="foodHelp" />
       <datalist id="foods"></datalist>
       <button type="button" id="voiceInputFood" title="Speak food name" aria-pressed="false" aria-label="Speak food name">🎙</button>
       <div id="foodHelp" style="font-size:12px;color:#666;margin-bottom:8px;">Select or speak the food name</div>
-      <label for="quantity">Quantity:</label><br>
+
+      <label for="quantity">Quantity:</label><br />
       <input type="number" id="quantity" name="quantity" value="1" min="1" required />
       <button type="button" id="voiceInputQty" title="Speak quantity" aria-pressed="false" aria-label="Speak quantity">🔊</button>
+
       <div style="margin-top:10px;">
         <button type="submit">Add to Order</button>
       </div>
     </form>
+
     <div id="orderList" aria-live="polite" style="margin-top:1rem;"></div>
     <hr />
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -88,13 +85,9 @@
     <div role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="background:#fff;padding:2em;border-radius:15px;max-width:400px;margin:auto;box-shadow:0 0 20px rgba(0,0,0,0.25);">
       <h3 id="modalTitle" style="margin-top:0;">Enter Your Details</h3>
       <form id="userInfoForm" autocomplete="off">
-
-        <!-- WhatsApp Number Only, Address removed -->
         <label for="customerMobile">WhatsApp Number (digits only) <span style="color:red;">*</span>:</label><br />
         <input type="tel" id="customerMobile" name="customerMobile" pattern="\d{7,15}" placeholder="Digits only" required />
-        <button type="button" id="voiceInputMobile" title="Speak mobile">🎙</button>
-        <br /><br />
-
+        <button type="button" id="voiceInputMobile" title="Speak mobile">🎙</button><br /><br />
         <div style="text-align:right;">
           <button type="button" id="cancelUserInfo" style="margin-right:1em;">Cancel</button>
           <button type="submit" id="sendBillFinal" style="background:#0288d1;color:#fff;padding:0.6em 1.2em;border:none;border-radius:12px;">Send</button>
@@ -108,9 +101,7 @@
   <!-- Google Login Init -->
   <script>
     function handleCredentialResponse(response) {
-      const data = jwt_decode(response.credential);
-      document.getElementById("userName").textContent = data.name;
-      document.getElementById("userEmail").textContent = data.email;
+      // On successful login, hide login container & show logout button and billing
       document.getElementById("loginContainer").style.display = "none";
       document.getElementById("userInfoDisplay").style.display = "block";
       document.getElementById("billingContainer").style.display = "block";
@@ -127,6 +118,14 @@
         { theme: "outline", size: "large" }
       );
     };
+
+    // Optional logout button logic (reload page or implement sign-out)
+    document.addEventListener('DOMContentLoaded', function () {
+      const logoutBtn = document.getElementById('logoutBtn');
+      logoutBtn.addEventListener('click', () => {
+        window.location.reload(); // Reload page to simulate logout, customize as needed
+      });
+    });
   </script>
 </body>
 </html>
