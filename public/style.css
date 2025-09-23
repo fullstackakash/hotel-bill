@@ -233,3 +233,27 @@ body.dark-mode button {
   background: linear-gradient(135deg, #4da3ff, #0078d7);
   color: #fff;
 }
+/* Existing @media queries remain intact */
+
+/* New styles for userInfoDisplay and billingContainer on small screens */
+@media (max-width: 600px) {
+  #userInfoDisplay {
+    font-size: 12px;
+    margin: 5px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40vw; /* restrict width for user info on mobile */
+  }
+
+  #billingContainer {
+    max-width: 100% !important; /* override max-width for full width */
+    margin: 0 auto;
+    padding: 1rem 0.5rem;
+  }
+}
+@media (max-width: 400px) {
+  #userInfoDisplay {
+    display: none; /* hide to give full focus to billing UI */
+  }
+}
