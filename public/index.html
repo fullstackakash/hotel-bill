@@ -6,7 +6,6 @@
   <title>Enhanced Food Billing System with Google Login</title>
   <link rel="stylesheet" href="./style.css" />
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
-
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- JWT decode library -->
@@ -14,7 +13,6 @@
   <!-- jsPDF + autoTable (for client-side PDF) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
   <style>
     #userInfoDisplay {
       text-align: right;
@@ -48,6 +46,8 @@
   </div>
 
   <div id="userInfoDisplay" style="display:none;">
+    <span id="userName" style="margin-right:12px;font-weight:bold;"></span>
+    <span id="userEmail" style="margin-right:12px;color:#555;"></span>
     <button id="logoutBtn">Logout</button>
   </div>
 
@@ -97,10 +97,8 @@
   </div>
 
   <script src="./app.js"></script>
-
   <script>
     function handleCredentialResponse(response) {
-      // On successful Google login, hide login and show bill + logout
       document.getElementById("loginContainer").style.display = "none";
       document.getElementById("userInfoDisplay").style.display = "block";
       document.getElementById("billingContainer").style.display = "block";
@@ -121,7 +119,7 @@
     document.addEventListener('DOMContentLoaded', function () {
       const logoutBtn = document.getElementById('logoutBtn');
       logoutBtn.addEventListener('click', () => {
-        window.location.reload(); // Simple logout by reload, customize if needed
+        window.location.reload();
       });
     });
   </script>
