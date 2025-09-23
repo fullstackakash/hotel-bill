@@ -88,17 +88,11 @@
     <div role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="background:#fff;padding:2em;border-radius:15px;max-width:400px;margin:auto;box-shadow:0 0 20px rgba(0,0,0,0.25);">
       <h3 id="modalTitle" style="margin-top:0;">Enter Your Details</h3>
       <form id="userInfoForm" autocomplete="off">
-        
-        <!-- WhatsApp Number -->
+
+        <!-- WhatsApp Number Only, Address removed -->
         <label for="customerMobile">WhatsApp Number (digits only) <span style="color:red;">*</span>:</label><br />
         <input type="tel" id="customerMobile" name="customerMobile" pattern="\d{7,15}" placeholder="Digits only" required />
         <button type="button" id="voiceInputMobile" title="Speak mobile">🎙</button>
-        <br /><br />
-
-        <!-- Address -->
-        <label for="customerAddress">Address <span style="color:red;">*</span>:</label><br />
-        <textarea id="customerAddress" name="customerAddress" rows="3" placeholder="Enter address" required></textarea>
-        <button type="button" id="voiceInputAddress" title="Speak address">🎙</button>
         <br /><br />
 
         <div style="text-align:right;">

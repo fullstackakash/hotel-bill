@@ -562,32 +562,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Attach voice button event listeners
-  function attachVoiceListeners() {
-    const foodVoiceBtn = document.getElementById('voiceInputFood');
-    const qtyVoiceBtn = document.getElementById('voiceInputQty');
-    const mobileVoiceBtn = document.getElementById('voiceInputMobile');
-    const addressVoiceBtn = document.getElementById('voiceInputAddress');
 
-    if (foodVoiceBtn) foodVoiceBtn.addEventListener('click', voiceFoodSuggest);
-    if (qtyVoiceBtn) qtyVoiceBtn.addEventListener('click', voiceQtySuggest);
-    if (mobileVoiceBtn) mobileVoiceBtn.addEventListener('click', () => {
-      voiceInput(val => {
-        const digits = val.replace(/\D/g, '');
-        if (!digits) {
-          speakText("Couldn't catch valid number, try again.");
-          return;
-        }
-        document.getElementById('customerMobile').value = digits;
-        speakText(`You said mobile number ${digits.split('').join(' ')}`);
-      }, 'Please say your WhatsApp number (digits only)');
-    });
-    if (addressVoiceBtn) addressVoiceBtn.addEventListener('click', () => {
-      voiceInput(val => {
-        document.getElementById('customerAddress').value = val;
-        speakText("Address set.");
-      }, 'Please say your address');
-    });
-  }
+function attachVoiceListeners() {
+  const voiceFoodBtn = document.getElementById('voiceInputFood');
+  const voiceQtyBtn = document.getElementById('voiceInputQty');
+  const voiceMobileBtn = document.getElementById('voiceInputMobile');
+
+  if (voiceFoodBtn) voiceFoodBtn.addEventListener('click', voiceFoodSuggest);
+  if (voiceQtyBtn) voiceQtyBtn.addEventListener('click', voiceQtySuggest);
+  if (voiceMobileBtn) voiceMobileBtn.addEventListener('click', () => {
+    voiceInput((val) => {
+      const digits = val.replace(/\D/g, '');
+      if (!digits) {
+        speakText("Couldn't catch a valid number, try again.");
+        return;
+      }
+      document.getElementById('customerMobile').value = digits;
+      speakText(`You said mobile number ${digits.split('').join(' ')}`);
+    }, "Please say your WhatsApp number");
+  });
+}
 
   function speakText(text) {
     return new Promise(resolve => {
